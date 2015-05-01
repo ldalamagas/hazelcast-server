@@ -3,6 +3,7 @@ package org.amazing.hazelcast;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import org.amazing.hazelcast.cluster.LoggingMembershipListener;
 import org.amazing.hazelcast.discovery.MemberRegistry;
 import org.amazing.hazelcast.discovery.ServerInstance;
 import org.slf4j.Logger;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -26,16 +28,14 @@ public class Server {
     @Autowired
     private MemberRegistry registry;
 
-    @Value("${server.host}")
-    private String host;
 
-    @Value("${server.port}")
+    @Value("${hazelcast.port:5701}")
     private int port;
 
-    @Value("${server.group}")
+    @Value("${hazelcast.group:local}")
     private String group;
 
-    @Value("${server.interface}")
+    @Value("${hazelcast.interface}")
     private String networkInterface;
 
     private HazelcastInstance hazelcast;
@@ -44,14 +44,23 @@ public class Server {
     @PostConstruct
     public void initialize() {
         try {
+
             logger.info("Initializing {}", this.getClass().getSimpleName());
             Set<ServerInstance> instances = registry.list();
             hazelcast = Hazelcast.newHazelcastInstance(createConfiguration(instances));
-            serverInstance = new ServerInstance(host, port);
-            registry.register(serverInstance);
+            hazelcast.getCluster().addMembershipListener(new LoggingMembershipListener());
+            introduceSelfToRegistry();
         } catch (Exception e) {
             logger.error("Failed to initialize server", e);
         }
+    }
+
+    private void introduceSelfToRegistry() {
+        InetSocketAddress address = hazelcast.getCluster().getLocalMember().getSocketAddress();
+        String host = address.getHostName();
+        int port = address.getPort();
+        serverInstance = new ServerInstance(host, port);
+        registry.register(serverInstance);
     }
 
     @PreDestroy

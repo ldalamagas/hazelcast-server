@@ -41,6 +41,7 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
 
     @Value("${zookeeper.host}")
     private String host;
+
     @Value("${zookeeper.port}")
     private int port;
 
@@ -65,13 +66,13 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
             }
 
         } catch (InterruptedException e) {
-            throw new RuntimeException("Failed to establish zookeeper connection");
+            throw new RuntimeException("Failed to establish zookeeper connection", e);
         }
 
         try {
             initializationLatch.await();
         } catch (InterruptedException e) {
-            throw new RuntimeException("Interrupted while initializing member registry");
+            throw new RuntimeException("Interrupted while initializing member registry", e);
         }
 
         logger.info("{} initialization complete", this.getClass().getSimpleName());
@@ -90,9 +91,9 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
             String json = objectMapper.writeValueAsString(s);
             client.create().withMode(CreateMode.EPHEMERAL).forPath(ZKPaths.makePath(BASE_PATH, s.getUrl()), json.getBytes());
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to serialise server instance " + s);
+            throw new RuntimeException("Failed to serialise server instance " + s, e);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to register server instance " + s);
+            throw new RuntimeException("Failed to register server instance " + s, e);
         }
     }
 
@@ -102,7 +103,7 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
         try {
             client.delete().forPath(ZKPaths.makePath(BASE_PATH, s.getUrl()));
         } catch (Exception e) {
-            throw new RuntimeException("Failed to unregister server instance " + s);
+            throw new RuntimeException("Failed to unregister server instance " + s, e);
         }
     }
 
@@ -120,7 +121,7 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
         } catch (IOException e) {
             throw new RuntimeException("Failed to retrieve server instances", e);
         }
-
+        logger.debug("Registered members {}", instances);
         return Collections.unmodifiableSet(instances);
     }
 
