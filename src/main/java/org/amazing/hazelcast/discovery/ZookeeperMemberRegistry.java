@@ -35,7 +35,6 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
 
     private static final Logger logger = LoggerFactory.getLogger(ZookeeperMemberRegistry.class);
     private static final RetryPolicy RETRY_POLICY = new ExponentialBackoffRetry(3000, 3);
-    private static final String BASE_PATH = "/services/hazelcast";
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private final CountDownLatch initializationLatch = new CountDownLatch(1);
 
@@ -44,6 +43,9 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
 
     @Value("${zookeeper.port}")
     private int port;
+
+    @Value("${zookeeper.path}")
+    private String path;
 
     private CuratorFramework client;
     private PathChildrenCache registryCache;
@@ -89,7 +91,7 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
         logger.debug("Adding {} to member registry", s);
         try {
             String json = objectMapper.writeValueAsString(s);
-            client.create().withMode(CreateMode.EPHEMERAL).forPath(ZKPaths.makePath(BASE_PATH, s.getUrl()), json.getBytes());
+            client.create().withMode(CreateMode.EPHEMERAL).forPath(ZKPaths.makePath(path, s.getUrl()), json.getBytes());
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialise server instance " + s, e);
         } catch (Exception e) {
@@ -101,7 +103,7 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
     public void unregister(ServerInstance s) {
         logger.debug("Removing {} from member registry", s);
         try {
-            client.delete().forPath(ZKPaths.makePath(BASE_PATH, s.getUrl()));
+            client.delete().forPath(ZKPaths.makePath(path, s.getUrl()));
         } catch (Exception e) {
             throw new RuntimeException("Failed to unregister server instance " + s, e);
         }
@@ -129,7 +131,7 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
         logger.debug("Zookeeper connection established");
         try {
             logger.debug("Initializing registry cache");
-            registryCache = new PathChildrenCache(client, BASE_PATH, true);
+            registryCache = new PathChildrenCache(client, path, true);
             registryCache.start(PathChildrenCache.StartMode.BUILD_INITIAL_CACHE);
             initializationLatch.countDown();
             logger.debug("Cache initialization complete");
