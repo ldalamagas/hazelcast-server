@@ -24,6 +24,7 @@ import java.util.Set;
 public class Server {
 
     private static final Logger logger = LoggerFactory.getLogger(Server.class);
+    private static final String INTERFACE_NOT_DEFINED = "";
 
     @Autowired
     private MemberRegistry registry;
@@ -35,7 +36,7 @@ public class Server {
     @Value("${hazelcast.group:local}")
     private String group;
 
-    @Value("${hazelcast.interface}")
+    @Value("${hazelcast.interface:}")
     private String networkInterface;
 
     private HazelcastInstance hazelcast;
@@ -80,8 +81,10 @@ public class Server {
         Config config = new Config();
         config.getGroupConfig().setName(group);
         config.getNetworkConfig().setPort(port);
-        config.getNetworkConfig().getInterfaces().setInterfaces(Collections.singletonList(networkInterface));
-        config.getNetworkConfig().getInterfaces().setEnabled(true);
+        if (!INTERFACE_NOT_DEFINED.equals(networkInterface)) {
+            config.getNetworkConfig().getInterfaces().setEnabled(true);
+            config.getNetworkConfig().getInterfaces().setInterfaces(Collections.singletonList(networkInterface));
+        }
         config.getNetworkConfig().getJoin().getAwsConfig().setEnabled(false);
         config.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
         config.getNetworkConfig().getJoin().getTcpIpConfig().setEnabled(true);
