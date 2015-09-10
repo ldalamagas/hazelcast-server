@@ -82,6 +82,7 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
 
     @PreDestroy
     private void destroy() {
+        logger.info("Destroying {} ", this.getClass().getSimpleName());
         CloseableUtils.closeQuietly(registryCache);
         CloseableUtils.closeQuietly(client);
     }
