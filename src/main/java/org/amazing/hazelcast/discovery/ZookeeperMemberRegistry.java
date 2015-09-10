@@ -38,16 +38,16 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private final CountDownLatch initializationLatch = new CountDownLatch(1);
 
-    @Value("${zookeeper.host}")
+    @Value("${zookeeper.host:localhost}")
     private String host;
 
-    @Value("${zookeeper.port}")
+    @Value("${zookeeper.port:2181}")
     private int port;
 
-    @Value("${zookeeper.path}")
+    @Value("${zookeeper.path:/services/hazelcast}")
     private String path;
 
-    @Value("${zookeeper.connection.timeout}")
+    @Value("${zookeeper.connection.timeout:10}")
     private int timeout;
 
     private CuratorFramework client;
