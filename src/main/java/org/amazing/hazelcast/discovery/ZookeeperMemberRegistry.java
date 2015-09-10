@@ -47,6 +47,9 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
     @Value("${zookeeper.path}")
     private String path;
 
+    @Value("${zookeeper.connection.timeout}")
+    private int timeout;
+
     private CuratorFramework client;
     private PathChildrenCache registryCache;
 
@@ -61,9 +64,9 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
         client.start();
         try {
 
-            logger.debug("Awaiting zookeeper connection");
+            logger.debug("Awaiting zookeeper connection, timeout set to {} seconds", timeout);
 
-            if (!client.blockUntilConnected(10, TimeUnit.SECONDS)) {
+            if (!client.blockUntilConnected(timeout, TimeUnit.SECONDS)) {
                 throw new RuntimeException("Zookeeper connection timed out");
             }
 
