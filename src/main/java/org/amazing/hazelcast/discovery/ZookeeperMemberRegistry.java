@@ -13,6 +13,7 @@ import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.curator.utils.CloseableUtils;
 import org.apache.curator.utils.ZKPaths;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -93,14 +94,29 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
     @Override
     public void register(ServerInstance s) {
         logger.debug("Adding {} to member registry", s);
+        String nodePath = ZKPaths.makePath(path, s.getUrl());
         try {
             String json = objectMapper.writeValueAsString(s);
-            client.create().withMode(CreateMode.EPHEMERAL).forPath(ZKPaths.makePath(path, s.getUrl()), json.getBytes());
+            client.create().withMode(CreateMode.EPHEMERAL).forPath(nodePath, json.getBytes());
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialise server instance " + s, e);
+        } catch (KeeperException.NodeExistsException e) {
+            deleteStaleNode(s, nodePath);
         } catch (Exception e) {
             throw new RuntimeException("Failed to register server instance " + s, e);
         }
+    }
+
+    private void deleteStaleNode(ServerInstance s, String nodePath) {
+        // A killed java process may leave the ephemeral node hanging until the session
+        // times-out so, delete and re-create the node
+        logger.debug("Node is already there probably hanging from a killed process. Will delete and re-create", s);
+        try {
+            client.delete().forPath(nodePath);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to register server instance " + s, e);
+        }
+        register(s);
     }
 
     @Override
