@@ -13,7 +13,6 @@ import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.curator.utils.CloseableUtils;
 import org.apache.curator.utils.ZKPaths;
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -65,7 +64,7 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
         client.start();
         try {
 
-            logger.debug("Awaiting zookeeper connection, timeout set to {} seconds", timeout);
+            logger.info("Awaiting zookeeper connection, timeout set to {} seconds", timeout);
 
             if (!client.blockUntilConnected(timeout, TimeUnit.SECONDS)) {
                 throw new RuntimeException("Zookeeper connection timed out");
@@ -94,29 +93,41 @@ public class ZookeeperMemberRegistry implements MemberRegistry, ConnectionStateL
     @Override
     public void register(ServerInstance s) {
         logger.debug("Adding {} to member registry", s);
-        String nodePath = ZKPaths.makePath(path, s.getUrl());
+        String registrationPath = ZKPaths.makePath(path, s.getUrl());
         try {
+
             String json = objectMapper.writeValueAsString(s);
-            client.create().withMode(CreateMode.EPHEMERAL).forPath(nodePath, json.getBytes());
+
+            if (registrationPathInUse(registrationPath)) {
+                // A killed java process may leave the ephemeral node hanging until the session
+                // times-out so, delete and re-create the node
+                logger.debug("Node is already there probably hanging from a killed process. Will delete and re-create");
+                deleteStaleRegistration(registrationPath);
+            }
+
+            client.create().withMode(CreateMode.EPHEMERAL).forPath(registrationPath, json.getBytes());
+
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialise server instance " + s, e);
-        } catch (KeeperException.NodeExistsException e) {
-            deleteStaleNode(s, nodePath);
         } catch (Exception e) {
             throw new RuntimeException("Failed to register server instance " + s, e);
         }
     }
 
-    private void deleteStaleNode(ServerInstance s, String nodePath) {
-        // A killed java process may leave the ephemeral node hanging until the session
-        // times-out so, delete and re-create the node
-        logger.debug("Node is already there probably hanging from a killed process. Will delete and re-create", s);
+    private void deleteStaleRegistration(String registrationPath) {
         try {
-            client.delete().forPath(nodePath);
+            client.delete().forPath(registrationPath);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to register server instance " + s, e);
+            throw new RuntimeException("Failed to delete stale registration " + registrationPath, e);
         }
-        register(s);
+    }
+
+    private boolean registrationPathInUse(String registrationPath) {
+        try {
+            return (client.checkExists().forPath(registrationPath) != null);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to check whether registration path is already in use " + registrationPath, e);
+        }
     }
 
     @Override
